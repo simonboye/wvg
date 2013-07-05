@@ -2,6 +2,7 @@
 
 <!--
    This file is part of wvg, a web viewer for vector gradients.
+
    Copyright (C) 2013 Simon Boyé and Millicent Billette
   
    This program is free software: you can redistribute it and/or modify
@@ -23,12 +24,16 @@
 		<meta charset="utf-8"/>
 		<title>Demo wqvg</title>
 		<link rel="stylesheet" href="style.css"/>
+		<script src="webgl-debug.js"></script>
 	</head>
 	<body>
 		<h1>Demo wqvg</h1>
 		<input id="wqvgFilename" type="file" value="data.wqvg"/>
-		<canvas id="demo-wqvg" width="300px" height="300px">Votre navigateur ne prend pas en charge cette démo, merci d'utiliser firefox ou google chrome en dernière version.</canvas>
-		<script src="wqvg.js"></script>
-		<script src="main.js"></script>
+		<canvas id="demo-wqvg" width="800px" height="600px">
+      Your web browser does not support the canvas element. Please use a recent
+      web browser with support for WebGL.
+    </canvas>
+		<script src="wqvg.js" type="text/javascript"></script>
+		<script src="main.js" type="text/javascript"></script>
 	</body>
 </html>
