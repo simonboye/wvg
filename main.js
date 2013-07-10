@@ -22,6 +22,7 @@
 //	bigCanvas.height = document.height-42;
 
 	var wqvg = new WqvgViewer(idCanvas);
+	wqvg.addControles();
 
 	document.getElementById('wqvgFilename').addEventListener("change", loadWqvgFromFile, false); 
 

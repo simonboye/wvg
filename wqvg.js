@@ -229,7 +229,7 @@ function WqvgViewer(idCanvas) {
 	}
 
 	this.render = function(){
-		console.log("Render");
+		//console.log("Render");
 
 		self.gl.clear(self.gl.COLOR_BUFFER_BIT);
 
@@ -397,6 +397,20 @@ function WqvgViewer(idCanvas) {
 		var zoomY = self.canvas.height / (maxY - minY);
 		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * .95 * 6.;
 	};
+
+	this.addControles = function (controlList){
+		if(!controlList) controlList = ['zoom','translate'];
+		if (controlList.indexOf('zoom') != -1) {
+			self.canvas.addEventListener("DOMMouseScroll", function(e){MouseWheelHandler(e)}, false);
+			self.canvas.addEventListener('mousewheel', function(e){MouseWheelHandler(e)}, false);
+			function MouseWheelHandler(e){
+				var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
+				//console.log(self.zoom);
+				self.zoom *= 1+.01*delta;
+				self.render();
+			}
+		}
+	}
 
 	this.initWebGL(idCanvas); // prévoir fallback canvas 2D
 	this.render();
