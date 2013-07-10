@@ -406,7 +406,7 @@ function WqvgViewer(idCanvas) {
 		self.viewCenter = [ (minX + maxX) / 2, (minY + maxY) / 2 ];
 		var zoomX = self.canvas.width / (maxX - minX);
 		var zoomY = self.canvas.height / (maxY - minY);
-		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * .95 * 6.;
+		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * .95;
 	};
 	
 	this.screenToScene = function(screen) {

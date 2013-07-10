@@ -29,4 +29,16 @@
 	function loadWqvgFromFile(event) {
 		wqvg.loadWqvg(event.target.files[0]);
 	}
+
+
+	// loading default Image
+	var defaultImage = new XMLHttpRequest();
+	defaultImage.open("GET", "data.wqvg", true);
+	defaultImage.responseType = "blob";
+
+	defaultImage.onload = function(e) {
+		wqvg.loadWqvg(e.target.response);
+	};
+
+	defaultImage.send();
 })();
