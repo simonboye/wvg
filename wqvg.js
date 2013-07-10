@@ -102,6 +102,17 @@ void main() {\n\
 }\n\
 ";
 
+function getOffset(el) {
+    var _x = 0;
+    var _y = 0;
+    while( el && !isNaN( el.offsetLeft ) && !isNaN( el.offsetTop ) ) {
+        _x += el.offsetLeft - el.scrollLeft;
+        _y += el.offsetTop - el.scrollTop;
+        el = el.offsetParent;
+    }
+    return [ _x, _y ];
+}
+
 function WqvgViewer(idCanvas) {
 	var self = this;
 	
@@ -397,18 +408,70 @@ function WqvgViewer(idCanvas) {
 		var zoomY = self.canvas.height / (maxY - minY);
 		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * .95 * 6.;
 	};
-
-	this.addControles = function (controlList){
+	
+	this.screenToScene = function(screen) {
+		return [
+			self.viewCenter[0] + (screen[0] - self.canvas.width / 2) / self.zoom,
+			self.viewCenter[1] - (screen[1] - self.canvas.height / 2) / self.zoom
+		];
+	}
+	
+	this.sceneToScreen = function(scene) {
+		return [
+			(scene[0] - self.viewCenter[0]) * self.zoom + self.canvas.width / 2,
+			-(scene[1] - self.viewCenter[1]) * self.zoom + self.canvas.height / 2,
+		];
+	}
+	
+	this.addControls = function (controlList){
 		if(!controlList) controlList = ['zoom','translate'];
 		if (controlList.indexOf('zoom') != -1) {
-			self.canvas.addEventListener("DOMMouseScroll", function(e){MouseWheelHandler(e)}, false);
-			self.canvas.addEventListener('mousewheel', function(e){MouseWheelHandler(e)}, false);
 			function MouseWheelHandler(e){
-				var delta = Math.max(-1, Math.min(1, (e.wheelDelta || -e.detail)));
-				//console.log(self.zoom);
-				self.zoom *= 1+.01*delta;
+				var delta = e.wheelDelta || -e.deltaY;
+				var factor = (delta>0.)? 1.1: 1./1.1;
+				
+				var offset = getOffset(self.canvas);
+				var scenePos = self.screenToScene(
+					[ e.clientX - offset[0], e.clientY - offset[1] ]);
+				
+				self.viewCenter = [
+					scenePos[0] + (self.viewCenter[0] - scenePos[0]) / factor,
+					scenePos[1] + (self.viewCenter[1] - scenePos[1]) / factor
+				];
+				self.zoom *= factor;
+				self.render();
+				e.preventDefault();
+			}
+
+			self.canvas.addEventListener("wheel", MouseWheelHandler, false);
+			self.canvas.addEventListener('mousewheel', MouseWheelHandler, false);
+		}
+		if (controlList.indexOf('translate') != -1) {
+			function mouseUpHandler(e) {
+				if(e.button === 0) {
+					self.lastMousePos = [ e.clientX, e.clientY ];
+					window.removeEventListener('mousemove', mouseMoveHandler);
+					window.removeEventListener('mouseup', mouseUpHandler);
+				}
+			}
+			function mouseDownHandler(e) {
+				if(e.button === 0) {
+					e.preventDefault();
+					self.lastMousePos = [ e.clientX, e.clientY ];
+					window.addEventListener('mousemove', mouseMoveHandler);
+					window.addEventListener('mouseup', mouseUpHandler);
+				}
+			}
+			function mouseMoveHandler(e) {
+				self.viewCenter = [
+					self.viewCenter[0] - (e.clientX-self.lastMousePos[0])/self.zoom,
+					self.viewCenter[1] + (e.clientY-self.lastMousePos[1])/self.zoom
+				];
+				self.lastMousePos = [ e.clientX, e.clientY ];
 				self.render();
 			}
+			
+			self.canvas.addEventListener('mousedown', mouseDownHandler);
 		}
 	}
 
