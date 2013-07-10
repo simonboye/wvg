@@ -21,7 +21,7 @@
 //	bigCanvas.width = document.width;
 //	bigCanvas.height = document.height-42;
 
-	var wqvg = new Wqvg(idCanvas);
+	var wqvg = new WqvgViewer(idCanvas);
 
 	document.getElementById('wqvgFilename').addEventListener("change", loadWqvgFromFile, false); 
 

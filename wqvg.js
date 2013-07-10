@@ -15,10 +15,128 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-function Wqvg(idCanvas) {
+var WqvgViewer_vertCommonSrc = "\
+uniform highp mat4 viewMatrix;\n\
+\n\
+attribute highp vec4 vx_position;\n\
+attribute mediump vec2 vx_triDataCoord;\n\
+attribute mediump vec3 vx_linearBasis;\n\
+\n\
+varying mediump vec2 triDataCoord;\n\
+varying mediump vec3 linearBasis;\n\
+\n\
+void main() {\n\
+	gl_Position = viewMatrix * vx_position;\n\
+	triDataCoord = vx_triDataCoord;\n\
+//				triDataCoord = vx_position.xy;\n\
+	linearBasis = vx_linearBasis;\n\
+}\n\
+";
+
+var WqvgViewer_fragTriangleSrc = "\
+uniform sampler2D color;\n\
+uniform mediump float offset;\n\
+\n\
+varying mediump vec2 triDataCoord;\n\
+varying mediump vec3 linearBasis;\n\
+\n\
+lowp vec4 quadraticInterp(in lowp vec4 colors[6]) {\n\
+	return\n\
+		colors[0] * linearBasis.x * (2. * linearBasis.x - 1.) +\n\
+		colors[1] * linearBasis.y * (2. * linearBasis.y - 1.) +\n\
+		colors[2] * linearBasis.z * (2. * linearBasis.z - 1.) +\n\
+		colors[3] * 4. * linearBasis.y * linearBasis.z +\n\
+		colors[4] * 4. * linearBasis.z * linearBasis.x +\n\
+		colors[5] * 4. * linearBasis.x * linearBasis.y;\n\
+}\n\
+\n\
+void main() {\n\
+	gl_FragColor = vec4(1., 0., 0., 1.);\n\
+	gl_FragColor = vec4(linearBasis, 1.);\n\
+	//gl_FragColor = vec4(triDataCoord*512., 0., 1.);\n\
+	lowp vec4 colors[6];\n\
+	colors[0] = texture2D(color, triDataCoord + vec2(offset*0., 0));\n\
+	colors[1] = texture2D(color, triDataCoord + vec2(offset*1., 0));\n\
+	colors[2] = texture2D(color, triDataCoord + vec2(offset*2., 0));\n\
+	colors[3] = texture2D(color, triDataCoord + vec2(offset*3., 0));\n\
+	colors[4] = texture2D(color, triDataCoord + vec2(offset*4., 0));\n\
+	colors[5] = texture2D(color, triDataCoord + vec2(offset*5., 0));\n\
+	gl_FragColor = quadraticInterp(colors);\n\
+//				gl_FragColor = texture2D(color, triDataCoord);\n\
+//				gl_FragColor = vec4(triDataCoord, 0., 1.);\n\
+}\n\
+";
+
+var WqvgViewer_fragSingularSrc = "\
+uniform sampler2D color;\n\
+uniform mediump float offset;\n\
+\n\
+varying mediump vec2 triDataCoord;\n\
+varying mediump vec3 linearBasis;\n\
+\n\
+lowp vec4 quadraticInterp(in lowp vec4 colors[6]) {\n\
+	return\n\
+		colors[0] * linearBasis.x * (2. * linearBasis.x - 1.) +\n\
+		colors[1] * linearBasis.y * (2. * linearBasis.y - 1.) +\n\
+		colors[2] * linearBasis.z * (2. * linearBasis.z - 1.) +\n\
+		colors[3] * 4. * linearBasis.y * linearBasis.z +\n\
+		colors[4] * 4. * linearBasis.z * linearBasis.x +\n\
+		colors[5] * 4. * linearBasis.x * linearBasis.y;\n\
+}\n\
+\n\
+void main() {\n\
+	gl_FragColor = vec4(1., 0., 0., 1.);\n\
+	gl_FragColor = vec4(linearBasis, 1.);\n\
+	//gl_FragColor = vec4(triDataCoord*512., 0., 1.);\n\
+	lowp vec4 colors[6];\n\
+	colors[0] = ( texture2D(color, triDataCoord + vec2(offset*0., 0))\n\
+				  + texture2D(color, triDataCoord + vec2(offset*3., 0)) ) * .5;\n\
+	colors[1] = texture2D(color, triDataCoord + vec2(offset*1., 0));\n\
+	colors[2] = texture2D(color, triDataCoord + vec2(offset*2., 0));\n\
+	colors[3] = texture2D(color, triDataCoord + vec2(offset*4., 0));\n\
+	colors[4] = texture2D(color, triDataCoord + vec2(offset*5., 0));\n\
+	colors[5] = texture2D(color, triDataCoord + vec2(offset*6., 0));\n\
+	gl_FragColor = quadraticInterp(colors);\n\
+//				gl_FragColor = texture2D(color, triDataCoord);\n\
+//				gl_FragColor = vec4(triDataCoord, 0., 1.);\n\
+}\n\
+";
+
+function WqvgViewer(idCanvas) {
 	var self = this;
+	
+	this.compileShaderFromSources = function(sources, type, name) {
+		var shader = self.gl.createShader(type);
+		self.gl.shaderSource(shader, sources);
+		self.gl.compileShader(shader);
+		if(!self.gl.getShaderParameter(shader, self.gl.COMPILE_STATUS)) {
+			console.error("Error: Shader '"+name+"':");
+			console.group();
+			console.warn(self.gl.getShaderInfoLog(shader));
+			console.groupEnd();
+			return null;
+		}
+		return shader;
+	}
+	
+	this.linkProgram = function(program, name) {
+		self.gl.bindAttribLocation(program, self.positionLoc, "vx_position");
+		self.gl.bindAttribLocation(program, self.triDataCoordLoc, "vx_triDataCoord");
+		self.gl.bindAttribLocation(program, self.linearBasisLoc, "vx_linearBasis");
+		self.gl.linkProgram(program);
+		if(!self.gl.getProgramParameter(program, self.gl.LINK_STATUS)) {
+			console.error("Error: Program '"+name+"':");
+			console.group();
+			console.warn(self.gl.getProgramInfoLog(self.triangleProgram));
+			console.groupEnd();
+		}
+		program.viewMatrixLoc = self.gl.getUniformLocation(program, "viewMatrix")
+		program.colorLoc = self.gl.getUniformLocation(program, "color")
+		program.offsetLoc = self.gl.getUniformLocation(program, "offset")
+	}
 
 	this.initWebGL = function (idCanvas) {
+		// Context creation...
 		self.canvas = document.getElementById(idCanvas);
 		if(!self.canvas) { alert("Erreur de chargement canvas"); return; }
 
@@ -31,144 +149,29 @@ function Wqvg(idCanvas) {
 		}
 		self.gl = WebGLDebugUtils.makeDebugContext(self.gl);
 
-		var vertCommonSrc = "\
-			uniform highp mat4 viewMatrix;\n\
-			attribute highp vec4 vx_position;\n\
-			attribute mediump vec2 vx_triDataCoord;\n\
-			attribute mediump vec3 vx_linearBasis;\n\
-			varying mediump vec2 triDataCoord;\n\
-			varying mediump vec3 linearBasis;\n\
-			void main() {\n\
-				gl_Position = viewMatrix * vx_position;\n\
-				triDataCoord = vx_triDataCoord;\n\
-//				triDataCoord = vx_position.xy;\n\
-				linearBasis = vx_linearBasis;\n\
-			}\n\
-		";
-
-		var fragTriangleSrc = "\
-			uniform sampler2D color;\n\
-			uniform mediump float offset;\n\
-			varying mediump vec2 triDataCoord;\n\
-			varying mediump vec3 linearBasis;\n\
-			lowp vec4 quadraticInterp(in lowp vec4 colors[6]) {\n\
-				return\n\
-					colors[0] * linearBasis.x * (2. * linearBasis.x - 1.) +\n\
-					colors[1] * linearBasis.y * (2. * linearBasis.y - 1.) +\n\
-					colors[2] * linearBasis.z * (2. * linearBasis.z - 1.) +\n\
-					colors[3] * 4. * linearBasis.y * linearBasis.z +\n\
-					colors[4] * 4. * linearBasis.z * linearBasis.x +\n\
-					colors[5] * 4. * linearBasis.x * linearBasis.y;\n\
-			}\n\
-			void main() {\n\
-				gl_FragColor = vec4(1., 0., 0., 1.);\n\
-				gl_FragColor = vec4(linearBasis, 1.);\n\
-				//gl_FragColor = vec4(triDataCoord*512., 0., 1.);\n\
-				lowp vec4 colors[6];\n\
-				colors[0] = texture2D(color, triDataCoord + vec2(offset*0., 0));\n\
-				colors[1] = texture2D(color, triDataCoord + vec2(offset*1., 0));\n\
-				colors[2] = texture2D(color, triDataCoord + vec2(offset*2., 0));\n\
-				colors[3] = texture2D(color, triDataCoord + vec2(offset*3., 0));\n\
-				colors[4] = texture2D(color, triDataCoord + vec2(offset*4., 0));\n\
-				colors[5] = texture2D(color, triDataCoord + vec2(offset*5., 0));\n\
-				gl_FragColor = quadraticInterp(colors);\n\
-//				gl_FragColor = texture2D(color, triDataCoord);\n\
-//				gl_FragColor = vec4(triDataCoord, 0., 1.);\n\
-			}\n\
-		";
-
-		var fragSingularSrc = "\
-			uniform sampler2D color;\n\
-			uniform mediump float offset;\n\
-			varying mediump vec2 triDataCoord;\n\
-			varying mediump vec3 linearBasis;\n\
-			lowp vec4 quadraticInterp(in lowp vec4 colors[6]) {\n\
-				return\n\
-					colors[0] * linearBasis.x * (2. * linearBasis.x - 1.) +\n\
-					colors[1] * linearBasis.y * (2. * linearBasis.y - 1.) +\n\
-					colors[2] * linearBasis.z * (2. * linearBasis.z - 1.) +\n\
-					colors[3] * 4. * linearBasis.y * linearBasis.z +\n\
-					colors[4] * 4. * linearBasis.z * linearBasis.x +\n\
-					colors[5] * 4. * linearBasis.x * linearBasis.y;\n\
-			}\n\
-			void main() {\n\
-				gl_FragColor = vec4(1., 0., 0., 1.);\n\
-				gl_FragColor = vec4(linearBasis, 1.);\n\
-				//gl_FragColor = vec4(triDataCoord*512., 0., 1.);\n\
-				lowp vec4 colors[6];\n\
-				colors[0] = ( texture2D(color, triDataCoord + vec2(offset*0., 0))\n\
-							  + texture2D(color, triDataCoord + vec2(offset*3., 0)) ) * .5;\n\
-				colors[1] = texture2D(color, triDataCoord + vec2(offset*1., 0));\n\
-				colors[2] = texture2D(color, triDataCoord + vec2(offset*2., 0));\n\
-				colors[3] = texture2D(color, triDataCoord + vec2(offset*4., 0));\n\
-				colors[4] = texture2D(color, triDataCoord + vec2(offset*5., 0));\n\
-				colors[5] = texture2D(color, triDataCoord + vec2(offset*6., 0));\n\
-				gl_FragColor = quadraticInterp(colors);\n\
-//				gl_FragColor = texture2D(color, triDataCoord);\n\
-//				gl_FragColor = vec4(triDataCoord, 0., 1.);\n\
-			}\n\
-		";
-
+		// Shaders compilation...
 		self.positionLoc = 0;
 		self.triDataCoordLoc = 1;
 		self.linearBasisLoc = 2;
 
-		self.vertCommonShader = self.gl.createShader(self.gl.VERTEX_SHADER);
-		self.gl.shaderSource(self.vertCommonShader, vertCommonSrc);
-		self.gl.compileShader(self.vertCommonShader);
-		if(!self.gl.getShaderParameter(self.vertCommonShader, self.gl.COMPILE_STATUS)) {
-			console.log("vertCommon log:");
-			console.log(self.gl.getShaderInfoLog(self.vertCommonShader));
-		}
-
-		self.fragTriangleShader = self.gl.createShader(self.gl.FRAGMENT_SHADER);
-		self.gl.shaderSource(self.fragTriangleShader, fragTriangleSrc);
-		self.gl.compileShader(self.fragTriangleShader);
-		if(!self.gl.getShaderParameter(self.fragTriangleShader, self.gl.COMPILE_STATUS)) {
-			console.log("fragTriangleShader log:\n");
-			console.log(self.gl.getShaderInfoLog(self.fragTriangleShader));
-		}
-
-		self.fragSingularShader = self.gl.createShader(self.gl.FRAGMENT_SHADER);
-		self.gl.shaderSource(self.fragSingularShader, fragSingularSrc);
-		self.gl.compileShader(self.fragSingularShader);
-		if(!self.gl.getShaderParameter(self.fragSingularShader, self.gl.COMPILE_STATUS)) {
-			console.log("fragSingularShader log:\n");
-			console.log(self.gl.getShaderInfoLog(self.fragSingularShader));
-		}
+		self.vertCommonShader = self.compileShaderFromSources(
+			WqvgViewer_vertCommonSrc, self.gl.VERTEX_SHADER, "vertCommon");
+		self.fragTriangleShader = self.compileShaderFromSources(
+			WqvgViewer_fragTriangleSrc, self.gl.FRAGMENT_SHADER, "fragTriangle");
+		self.fragSingularShader = self.compileShaderFromSources(
+			WqvgViewer_fragSingularSrc, self.gl.FRAGMENT_SHADER, "fragSingular");
 
 		self.triangleProgram = self.gl.createProgram();
 		self.gl.attachShader(self.triangleProgram, self.vertCommonShader);
 		self.gl.attachShader(self.triangleProgram, self.fragTriangleShader);
-		self.gl.bindAttribLocation(self.triangleProgram, self.positionLoc, "vx_position");
-		self.gl.bindAttribLocation(self.triangleProgram, self.triDataCoordLoc, "vx_triDataCoord");
-		self.gl.bindAttribLocation(self.triangleProgram, self.linearBasisLoc, "vx_linearBasis");
-		self.gl.linkProgram(self.triangleProgram);
-		if(!self.gl.getProgramParameter(self.triangleProgram, self.gl.LINK_STATUS)) {
-			console.log("triangle program log:\n");
-			console.log(self.gl.getProgramInfoLog(self.triangleProgram));
-		}
-		
-		self.viewMatrixTriangleLoc = self.gl.getUniformLocation(self.triangleProgram, "viewMatrix")
-		self.colorTriangleLoc = self.gl.getUniformLocation(self.triangleProgram, "color")
-		self.offsetTriangleLoc = self.gl.getUniformLocation(self.triangleProgram, "offset")
+		self.linkProgram(self.triangleProgram, "triangle");
 		
 		self.singularProgram = self.gl.createProgram();
 		self.gl.attachShader(self.singularProgram, self.vertCommonShader);
 		self.gl.attachShader(self.singularProgram, self.fragSingularShader);
-		self.gl.bindAttribLocation(self.singularProgram, self.positionLoc, "vx_position");
-		self.gl.bindAttribLocation(self.singularProgram, self.triDataCoordLoc, "vx_triDataCoord");
-		self.gl.bindAttribLocation(self.singularProgram, self.linearBasisLoc, "vx_linearBasis");
-		self.gl.linkProgram(self.singularProgram);
-		if(!self.gl.getProgramParameter(self.singularProgram, self.gl.LINK_STATUS)) {
-			console.log("singular program log:\n");
-			console.log(self.gl.getProgramInfoLog(self.singularProgram));
-		}
+		self.linkProgram(self.singularProgram, "singular");
 		
-		self.viewMatrixSingularLoc = self.gl.getUniformLocation(self.singularProgram, "viewMatrix")
-		self.colorSingularLoc = self.gl.getUniformLocation(self.singularProgram, "color")
-		self.offsetSingularLoc = self.gl.getUniformLocation(self.singularProgram, "offset")
-
+		// Default image...
 		self.initBuffers(1, 0, [
 			0, 0,
 			1, 0,
@@ -184,97 +187,69 @@ function Wqvg(idCanvas) {
 		self.gl.clearColor(0.0, 0.0, 0.0, 1.0); // fond noir
 		self.gl.viewport(0, 0, self.canvas.width, self.canvas.height);
 		
+		// View parameters
 		self.viewCenter = [ .5, .5 ];
 		self.zoom = 550.;
 	};
+	
+	this.renderPass = function(program, buffer, offset, size) {
+		self.gl.useProgram(program);
+		
+		if(program.viewMatrixLoc)
+			self.gl.uniformMatrix4fv(program.viewMatrixLoc, false, self.viewMatrix);
+		
+		if(program.colorLoc) {
+			self.gl.activeTexture(self.gl.TEXTURE0);
+			self.gl.bindTexture(self.gl.TEXTURE_2D, self.colorTexture);
+			self.gl.uniform1i(program.colorLoc, 0);
+		}
+		
+		if(program.offsetLoc)
+			self.gl.uniform1f(program.offsetLoc, 1./self.colorTextureWidth);
+
+		self.gl.bindBuffer(self.gl.ARRAY_BUFFER, buffer);
+
+		self.gl.enableVertexAttribArray(self.positionLoc);
+		self.gl.vertexAttribPointer(self.positionLoc, 2,
+				self.gl.FLOAT, false, self.nbVxComponent*4, 0);
+
+		self.gl.enableVertexAttribArray(self.triDataCoordLoc);
+		self.gl.vertexAttribPointer(self.triDataCoordLoc, 2,
+				self.gl.FLOAT, false, self.nbVxComponent*4, 2*4);
+
+		self.gl.enableVertexAttribArray(self.linearBasisLoc);
+		self.gl.vertexAttribPointer(self.linearBasisLoc, 3,
+				self.gl.FLOAT, false, self.nbVxComponent*4, 4*4);
+
+		self.gl.drawArrays(self.gl.TRIANGLES, offset, size);
+
+		self.gl.disableVertexAttribArray(program.offsetLoc);
+		self.gl.disableVertexAttribArray(program.colorLoc);
+		self.gl.disableVertexAttribArray(program.viewMatrixLoc);
+	}
 
 	this.render = function(){
 		console.log("Render");
 
 		self.gl.clear(self.gl.COLOR_BUFFER_BIT);
 
-		var viewMatrix = [
+		self.viewMatrix = [
 			1, 0, 0, 0,
 			0, 1, 0, 0,
 			0, 0, 1, 0,
 			0, 0, 0, 1
 		];
-		viewMatrix[0] = 2.*self.zoom / self.canvas.width;
-		viewMatrix[5] = 2.*self.zoom / self.canvas.height;
-		viewMatrix[12] = -self.viewCenter[0] * viewMatrix[0];
-		viewMatrix[13] = -self.viewCenter[1] * viewMatrix[5];
+		self.viewMatrix[0] = 2.*self.zoom / self.canvas.width;
+		self.viewMatrix[5] = 2.*self.zoom / self.canvas.height;
+		self.viewMatrix[12] = -self.viewCenter[0] * self.viewMatrix[0];
+		self.viewMatrix[13] = -self.viewCenter[1] * self.viewMatrix[5];
 //		console.log("viewMatrix:", viewMatrix);
-		if(self.nbTriangle && self.nbTriangle != 0) {
-			self.gl.useProgram(self.triangleProgram);
-			
-			if(self.viewMatrixTriangleLoc)
-				self.gl.uniformMatrix4fv(self.viewMatrixTriangleLoc, false, viewMatrix);
-			
-			if(self.colorTriangleLoc) {
-				self.gl.activeTexture(self.gl.TEXTURE0);
-				self.gl.bindTexture(self.gl.TEXTURE_2D, self.colorTexture);
-				self.gl.uniform1i(self.colorTriangleLoc, 0);
-			}
-			
-			if(self.offsetTriangleLoc)
-				self.gl.uniform1f(self.offsetTriangleLoc, 1./self.colorTextureWidth);
-
-			self.gl.bindBuffer(self.gl.ARRAY_BUFFER, self.vertexBuffer);
-
-			self.gl.enableVertexAttribArray(self.positionLoc);
-			self.gl.vertexAttribPointer(self.positionLoc, 2,
-					self.gl.FLOAT, false, self.nbVxComponent*4, 0);
-
-			self.gl.enableVertexAttribArray(self.triDataCoordLoc);
-			self.gl.vertexAttribPointer(self.triDataCoordLoc, 2,
-					self.gl.FLOAT, false, self.nbVxComponent*4, 2*4);
-
-			self.gl.enableVertexAttribArray(self.linearBasisLoc);
-			self.gl.vertexAttribPointer(self.linearBasisLoc, 3,
-					self.gl.FLOAT, false, self.nbVxComponent*4, 4*4);
-
-			self.gl.drawArrays(self.gl.TRIANGLES, 0, self.nbTriangle*3);
-
-			self.gl.disableVertexAttribArray(self.linearBasisLoc);
-			self.gl.disableVertexAttribArray(self.triDataCoordLoc);
-			self.gl.disableVertexAttribArray(self.positionLoc);
-		}
-		
-		if(self.nbSingular && self.nbSingular != 0) {
-			self.gl.useProgram(self.singularProgram);
-			
-			if(self.viewMatrixSingularLoc)
-				self.gl.uniformMatrix4fv(self.viewMatrixSingularLoc, false, viewMatrix);
-
-			if(self.colorSingularLoc) {
-				self.gl.activeTexture(self.gl.TEXTURE0);
-				self.gl.bindTexture(self.gl.TEXTURE_2D, self.colorTexture);
-				self.gl.uniform1i(self.colorSingularLoc, 0);
-			}
-			
-			if(self.offsetSingularLoc)
-				self.gl.uniform1f(self.offsetSingularLoc, 1./self.colorTextureWidth);
-
-			self.gl.bindBuffer(self.gl.ARRAY_BUFFER, self.vertexBuffer);
-
-			self.gl.enableVertexAttribArray(self.positionLoc);
-			self.gl.vertexAttribPointer(self.positionLoc, 2,
-					self.gl.FLOAT, false, self.nbVxComponent*4, 0);
-
-			self.gl.enableVertexAttribArray(self.triDataCoordLoc);
-			self.gl.vertexAttribPointer(self.triDataCoordLoc, 2,
-					self.gl.FLOAT, false, self.nbVxComponent*4, 2*4);
-
-			self.gl.enableVertexAttribArray(self.linearBasisLoc);
-			self.gl.vertexAttribPointer(self.linearBasisLoc, 3,
-					self.gl.FLOAT, false, self.nbVxComponent*4, 4*4);
-
-			self.gl.drawArrays(self.gl.TRIANGLES, self.nbTriangle*3, self.nbSingular*3);
-
-			self.gl.disableVertexAttribArray(self.linearBasisLoc);
-			self.gl.disableVertexAttribArray(self.triDataCoordLoc);
-			self.gl.disableVertexAttribArray(self.positionLoc);
-		}
+		if(self.nbTriangle && self.nbTriangle != 0)
+			self.renderPass(self.triangleProgram, self.vertexBuffer,
+				0, self.nbTriangle*3);
+		if(self.nbSingular && self.nbSingular != 0)
+			self.renderPass(self.singularProgram, self.vertexBuffer,
+				self.nbTriangle*3, self.nbSingular*3);
 	};
 
 	this.loadWqvg = function (wqvgBlob){
@@ -420,37 +395,8 @@ function Wqvg(idCanvas) {
 		self.viewCenter = [ (minX + maxX) / 2, (minY + maxY) / 2 ];
 		var zoomX = self.canvas.width / (maxX - minX);
 		var zoomY = self.canvas.height / (maxY - minY);
-		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * .95;
+		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * .95 * 6.;
 	};
-
-/*	this.loadShader = function(shaderId) {
-		var elem = document.getElementById(shaderId);
-		if(!elem)
-			return null;
-
-		var shaderType =
-			(elem.type == "x-shader/x-vertex")? gl.VERTEX_SHADER:
-			(elem.type == "x-shader/x-fragment")? gl.FRAGMENT_SHADER: null;
-		
-		if(!shaderType)
-			return null;
-			
-		var source = 0;
-		var content = elem.firstChild;
-		while(content) {
-			if(content.nodeType == content.TEXT_NODE)
-				source += content.textContent;
-			content = content.nextSibling;
-		}
-	
-		self.vertexShader = gl.createShader(shaderType);
-		gl.shaderSource(self.vertexShader, source);
-		gl.compileShader(self.vertexShader);
-		if(!gl.getShaderParameter(self.vertexShader, gl.COMPILE_STATUS)) {
-			console.log("Vertex shader log:");
-			console.log(gl.getShaderInfoLog(self.vertexShader));
-		}
-	};*/
 
 	this.initWebGL(idCanvas); // prévoir fallback canvas 2D
 	this.render();
