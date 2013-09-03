@@ -289,7 +289,7 @@ function WqvgViewer(idCanvas) {
 				self.nbTriangle*3, self.nbSingular*3);
 	};
 
-	this.loadWqvg = function (wqvgBlob){
+	this.loadWqvg = function(wqvgBlob){
 		var reader = new FileReader();
 		reader.onload = function(event) {
 			var rawBuffer = event.target.result;
@@ -300,7 +300,7 @@ function WqvgViewer(idCanvas) {
 			var header = new Uint32Array(rawBuffer, pos, nbHeaderInt);
 			pos += nbHeaderInt * 4;
 
-			if(header[0] != 0x67767177 || header[1] != 1) {
+			if(header[0] != 0x67767177 || header[1] > 2) {
 				console.log("Error: file with wrong header.");
 				return;
 			}
@@ -311,23 +311,34 @@ function WqvgViewer(idCanvas) {
 			console.log("nbTriangle:", nbTriangle);
 			console.log("nbSingular:", nbSingular);
 
+            if(header[1] >= 2) {    // File has comment
+                var commentSize = (new Uint32Array(rawBuffer, pos, 1))[0];
+//                console.log("Comment:", commentSize);
+    			pos += 4;
+                var asciiBuffer = new Uint8Array(rawBuffer, pos, commentSize);
+                self.qvgComment = String.fromCharCode.apply(null, asciiBuffer);
+    			pos += commentSize;
+                console.log(self.qvgComment);
+            }
+
 			var vertexDataSize = (2 * nbVertex) * 4;
 			if(pos + vertexDataSize > rawBuffer.byteLength) { console.log("Error: Unexpected end of file."); return; }
 			console.log("nbCoord:", vertexDataSize, "pos:", pos);
-			var vertexArray = new Float32Array(rawBuffer, pos, 2 * nbVertex);
+			console.log(rawBuffer, pos, 2 * nbVertex);
+			var vertexArray = new Float32Array(rawBuffer.slice(pos, pos+vertexDataSize));
 //			console.log(vertexArray);
 			pos += vertexDataSize;
 
-			var nbIndex = 3 * (nbTriangle+nbSingular);
-			if(pos + nbIndex * 4 > rawBuffer.byteLength) { console.log("Error: Unexpected end of file."); return; }
-			var indexArray = new Uint32Array(rawBuffer, pos, nbIndex);
-			pos += nbIndex * 4;
+			var indexDataSize = 3 * (nbTriangle+nbSingular) * 4;
+			if(pos + indexDataSize > rawBuffer.byteLength) { console.log("Error: Unexpected end of file."); return; }
+			var indexArray = new Uint32Array(rawBuffer.slice(pos, pos + indexDataSize));
+			pos += indexDataSize;
 //			console.log(indexArray);
 
-			var nbColor = 6*nbTriangle + 7*nbSingular;
-			if(pos + nbColor * 4 > rawBuffer.byteLength) { console.log("Error: Unexpected end of file."); return; }
-			var colorArray = new Uint32Array(rawBuffer, pos, nbColor);
-			pos += nbColor * 4;
+			var colorDataSize = (6*nbTriangle + 7*nbSingular) * 4;
+			if(pos + colorDataSize > rawBuffer.byteLength) { console.log("Error: Unexpected end of file."); return; }
+			var colorArray = new Uint32Array(rawBuffer.slice(pos, pos + colorDataSize));
+			pos += colorDataSize;
 //			console.log(colorArray);
 
 			self.initBuffers(nbTriangle, nbSingular,
@@ -416,9 +427,6 @@ function WqvgViewer(idCanvas) {
 				var ax_02 = Math.atan2(v2y-v0y, v2x-v0x);
 				if(ax_02 < ax_01)
 					ax_02 += Math.PI * 2.0;
-				console.log("vx:", v0x, v0y, v1x, v1y, v2x, v2y);
-				console.log("vec: ", v1x-v0x, v1y-v0y, v2x-v0x, v2y-v0y);
-				console.log("angles: ", ax_01, ax_02 - ax_01);
 				for(var i=0; i<3; ++i) {
 					self.singularAngleArray[singArrayIndex++] = v0x;
 					self.singularAngleArray[singArrayIndex++] = v0y;
