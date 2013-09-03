@@ -21,17 +21,22 @@ uniform highp mat4 viewMatrix;\n\
 attribute highp vec4 vx_position;\n\
 attribute mediump vec2 vx_triDataCoord;\n\
 attribute mediump vec3 vx_linearBasis;\n\
+attribute mediump vec4 vx_singularAngle;\n\
 \n\
+varying mediump vec2 position;\n\
 varying mediump vec2 triDataCoord;\n\
 varying mediump vec3 linearBasis;\n\
+varying mediump vec4 singularAngle;\n\
 \n\
 void main() {\n\
 	gl_Position = viewMatrix * vx_position;\n\
+	position = vx_position.xy;\n\
 	triDataCoord = vx_triDataCoord;\n\
 //				triDataCoord = vx_position.xy;\n\
 	linearBasis = vx_linearBasis;\n\
+	singularAngle = vec4(vx_position.xy - vx_singularAngle.xy, vx_singularAngle.zw);\n\
 }\n\
-";
+ ";
 
 var WqvgViewer_fragTriangleSrc = "\
 uniform sampler2D color;\n\
@@ -65,14 +70,18 @@ void main() {\n\
 //				gl_FragColor = texture2D(color, triDataCoord);\n\
 //				gl_FragColor = vec4(triDataCoord, 0., 1.);\n\
 }\n\
-";
+ ";
 
 var WqvgViewer_fragSingularSrc = "\
 uniform sampler2D color;\n\
 uniform mediump float offset;\n\
 \n\
+varying mediump vec2 position;\n\
 varying mediump vec2 triDataCoord;\n\
 varying mediump vec3 linearBasis;\n\
+varying mediump vec4 singularAngle;\n\
+\n\
+const mediump float pi = 3.141592654;\n\
 \n\
 lowp vec4 quadraticInterp(in lowp vec4 colors[6]) {\n\
 	return\n\
@@ -85,12 +94,14 @@ lowp vec4 quadraticInterp(in lowp vec4 colors[6]) {\n\
 }\n\
 \n\
 void main() {\n\
-	gl_FragColor = vec4(1., 0., 0., 1.);\n\
-	gl_FragColor = vec4(linearBasis, 1.);\n\
-	//gl_FragColor = vec4(triDataCoord*512., 0., 1.);\n\
+	mediump float alpha = atan(singularAngle.y, singularAngle.x);\n\
+	alpha = (((alpha < singularAngle.z-1.)? alpha+pi*2.0: alpha)\n\
+		- singularAngle.z) / singularAngle.w;\n\
+\n\
 	lowp vec4 colors[6];\n\
-	colors[0] = ( texture2D(color, triDataCoord + vec2(offset*0., 0))\n\
-				  + texture2D(color, triDataCoord + vec2(offset*3., 0)) ) * .5;\n\
+	colors[0] = mix(\n\
+		texture2D(color, triDataCoord + vec2(offset*0., 0)),\n\
+		texture2D(color, triDataCoord + vec2(offset*3., 0)), alpha);\n\
 	colors[1] = texture2D(color, triDataCoord + vec2(offset*1., 0));\n\
 	colors[2] = texture2D(color, triDataCoord + vec2(offset*2., 0));\n\
 	colors[3] = texture2D(color, triDataCoord + vec2(offset*4., 0));\n\
@@ -99,8 +110,10 @@ void main() {\n\
 	gl_FragColor = quadraticInterp(colors);\n\
 //				gl_FragColor = texture2D(color, triDataCoord);\n\
 //				gl_FragColor = vec4(triDataCoord, 0., 1.);\n\
+//	gl_FragColor = vec4(vec3(alpha), 1.);\n\
+//	gl_FragColor = vec4(position.xy-singularAngle.xy, 0., 1.);\n\
 }\n\
-";
+ ";
 
 function getOffset(el) {
     var _x = 0;
@@ -128,12 +141,13 @@ function WqvgViewer(idCanvas) {
 			return null;
 		}
 		return shader;
-	}
+	};
 	
 	this.linkProgram = function(program, name) {
 		self.gl.bindAttribLocation(program, self.positionLoc, "vx_position");
 		self.gl.bindAttribLocation(program, self.triDataCoordLoc, "vx_triDataCoord");
 		self.gl.bindAttribLocation(program, self.linearBasisLoc, "vx_linearBasis");
+		self.gl.bindAttribLocation(program, self.singularAngleLoc, "vx_singularAngle");
 		self.gl.linkProgram(program);
 		if(!self.gl.getProgramParameter(program, self.gl.LINK_STATUS)) {
 			console.error("Error: Program '"+name+"':");
@@ -141,10 +155,11 @@ function WqvgViewer(idCanvas) {
 			console.warn(self.gl.getProgramInfoLog(self.triangleProgram));
 			console.groupEnd();
 		}
-		program.viewMatrixLoc = self.gl.getUniformLocation(program, "viewMatrix")
-		program.colorLoc = self.gl.getUniformLocation(program, "color")
-		program.offsetLoc = self.gl.getUniformLocation(program, "offset")
-	}
+		// Caches uniforms locations directly in the program object.
+		program.viewMatrixLoc = self.gl.getUniformLocation(program, "viewMatrix");
+		program.colorLoc = self.gl.getUniformLocation(program, "color");
+		program.offsetLoc = self.gl.getUniformLocation(program, "offset");
+	};
 
 	this.initWebGL = function (idCanvas) {
 		// Context creation...
@@ -160,11 +175,13 @@ function WqvgViewer(idCanvas) {
 		}
 		self.gl = WebGLDebugUtils.makeDebugContext(self.gl);
 
-		// Shaders compilation...
+		// Vertex attibute bindings
 		self.positionLoc = 0;
 		self.triDataCoordLoc = 1;
 		self.linearBasisLoc = 2;
+		self.singularAngleLoc = 3;
 
+        // Shader compilation...
 		self.vertCommonShader = self.compileShaderFromSources(
 			WqvgViewer_vertCommonSrc, self.gl.VERTEX_SHADER, "vertCommon");
 		self.fragTriangleShader = self.compileShaderFromSources(
@@ -183,6 +200,7 @@ function WqvgViewer(idCanvas) {
 		self.linkProgram(self.singularProgram, "singular");
 		
 		// Default image...
+		// TODO: Load somthing nice !
 		self.initBuffers(1, 0, [
 			0, 0,
 			1, 0,
@@ -195,12 +213,13 @@ function WqvgViewer(idCanvas) {
 			0xffff00ff,
 			0xff00ffff ]);
 
-		self.gl.clearColor(0.0, 0.0, 0.0, 1.0); // fond noir
+		// Global GL parameters
+		self.gl.clearColor(0.0, 0.0, 0.0, 1.0);
 		self.gl.viewport(0, 0, self.canvas.width, self.canvas.height);
 		
 		// View parameters
-		self.viewCenter = [ .5, .5 ];
-		self.zoom = 550.;
+		self.viewCenter = [ 0.5, 0.5 ];
+		self.zoom = 550.0;
 	};
 	
 	this.renderPass = function(program, buffer, offset, size) {
@@ -216,28 +235,35 @@ function WqvgViewer(idCanvas) {
 		}
 		
 		if(program.offsetLoc)
-			self.gl.uniform1f(program.offsetLoc, 1./self.colorTextureWidth);
+			self.gl.uniform1f(program.offsetLoc, 1.0/self.colorTextureWidth);
 
 		self.gl.bindBuffer(self.gl.ARRAY_BUFFER, buffer);
 
 		self.gl.enableVertexAttribArray(self.positionLoc);
 		self.gl.vertexAttribPointer(self.positionLoc, 2,
-				self.gl.FLOAT, false, self.nbVxComponent*4, 0);
+				self.gl.FLOAT, false, self.nbVxComponent*4, 0 + self.nbVxComponent*4*offset);
 
 		self.gl.enableVertexAttribArray(self.triDataCoordLoc);
 		self.gl.vertexAttribPointer(self.triDataCoordLoc, 2,
-				self.gl.FLOAT, false, self.nbVxComponent*4, 2*4);
+				self.gl.FLOAT, false, self.nbVxComponent*4, 2*4 + self.nbVxComponent*4*offset);
 
 		self.gl.enableVertexAttribArray(self.linearBasisLoc);
 		self.gl.vertexAttribPointer(self.linearBasisLoc, 3,
-				self.gl.FLOAT, false, self.nbVxComponent*4, 4*4);
+				self.gl.FLOAT, false, self.nbVxComponent*4, 4*4 + self.nbVxComponent*4*offset);
+				
+		if(program == self.singularProgram) {
+			self.gl.bindBuffer(self.gl.ARRAY_BUFFER, self.singularAngleBuffer);
+			self.gl.enableVertexAttribArray(self.singularAngleLoc);
+			self.gl.vertexAttribPointer(self.singularAngleLoc, 4,
+					self.gl.FLOAT, false, 4*4, 0);
+		}
 
-		self.gl.drawArrays(self.gl.TRIANGLES, offset, size);
+		self.gl.drawArrays(self.gl.TRIANGLES, 0, size);
 
 		self.gl.disableVertexAttribArray(program.offsetLoc);
 		self.gl.disableVertexAttribArray(program.colorLoc);
 		self.gl.disableVertexAttribArray(program.viewMatrixLoc);
-	}
+	};
 
 	this.render = function(){
 		//console.log("Render");
@@ -250,15 +276,15 @@ function WqvgViewer(idCanvas) {
 			0, 0, 1, 0,
 			0, 0, 0, 1
 		];
-		self.viewMatrix[0] = 2.*self.zoom / self.canvas.width;
-		self.viewMatrix[5] = 2.*self.zoom / self.canvas.height;
+		self.viewMatrix[0] = 2.0*self.zoom / self.canvas.width;
+		self.viewMatrix[5] = 2.0*self.zoom / self.canvas.height;
 		self.viewMatrix[12] = -self.viewCenter[0] * self.viewMatrix[0];
 		self.viewMatrix[13] = -self.viewCenter[1] * self.viewMatrix[5];
 //		console.log("viewMatrix:", viewMatrix);
-		if(self.nbTriangle && self.nbTriangle != 0)
+		if(self.nbTriangle !== 0)
 			self.renderPass(self.triangleProgram, self.vertexBuffer,
 				0, self.nbTriangle*3);
-		if(self.nbSingular && self.nbSingular != 0)
+		if(self.nbSingular !== 0)
 			self.renderPass(self.singularProgram, self.vertexBuffer,
 				self.nbTriangle*3, self.nbSingular*3);
 	};
@@ -319,10 +345,13 @@ function WqvgViewer(idCanvas) {
 		self.nbTriangle = nbTriangle;
 		self.nbSingular = nbSingular;
 
-		self.nbVxComponent = 7;
+		self.nbVxComponent = 7;	// coord: 2, color index: 2, linear basis: 3
 		self.nbTriangleComponent = 6;
 		self.nbSingularComponent = 7;
 		
+		// Starts for a texture of 16 by 16, and grow it until we can fit all
+		// color nodes.
+		// TODO: Refactor this !
 		self.colorTextureWidth = 16;
 		self.colorTextureHeight = 16;
 		var triPerRow = Math.floor(self.colorTextureWidth / self.nbTriangleComponent);
@@ -338,11 +367,16 @@ function WqvgViewer(idCanvas) {
 			if(totalHeight > self.colorTextureHeight)
 				self.colorTextureHeight *= 2;
 		}
+		
+		// Fill vertex array and generate a texture containing the color nodes.
 		self.vertexArray = new Float32Array((self.nbTriangle+self.nbSingular) * 3 * self.nbVxComponent);
 		self.colorTextureArray = new Uint32Array(self.colorTextureWidth * self.colorTextureHeight);
+		//	sing vertex coord: 2, angle between i and(v0, v1), angle of the singular vertex.
+		self.singularAngleArray = new Float32Array(self.nbSingular * 3 * 4);
 		var index = 0;
-		var halfTexelX = .5 / self.colorTextureWidth;
-		var halfTexelY = .5 / self.colorTextureHeight;
+		var singArrayIndex = 0;
+		var halfTexelX = 0.5 / self.colorTextureWidth;
+		var halfTexelY = 0.5 / self.colorTextureHeight;
 		var colorIndex = 0;
 		for(var tri=0; tri<(self.nbTriangle+self.nbSingular); ++tri) {
 			var nbColor = (tri<self.nbTriangle)? 6: 7; // Singular triangles have 7 colors.
@@ -363,13 +397,34 @@ function WqvgViewer(idCanvas) {
 				self.vertexArray[index++] = dataCoordY / self.colorTextureHeight + halfTexelY;
 				
 				// Linear basis functions - vec3
-				self.vertexArray[index++] = (vx == 0)? 1: 0;
-				self.vertexArray[index++] = (vx == 1)? 1: 0;
-				self.vertexArray[index++] = (vx == 2)? 1: 0;
+				self.vertexArray[index++] = (vx === 0)? 1: 0;
+				self.vertexArray[index++] = (vx === 1)? 1: 0;
+				self.vertexArray[index++] = (vx === 2)? 1: 0;
 			}
 			var baseDataIndex = dataCoordX + dataCoordY*self.colorTextureWidth;
 			for(var col=0; col<nbColor; ++col) {
 				self.colorTextureArray[baseDataIndex + col] = colors[colorIndex++];
+			}
+			if(tri >= self.nbTriangle) {
+				var v0x = positions[indices[tri*3 + 0] * 2 + 0];
+				var v0y = positions[indices[tri*3 + 0] * 2 + 1];
+				var v1x = positions[indices[tri*3 + 1] * 2 + 0];
+				var v1y = positions[indices[tri*3 + 1] * 2 + 1];
+				var v2x = positions[indices[tri*3 + 2] * 2 + 0];
+				var v2y = positions[indices[tri*3 + 2] * 2 + 1];
+				var ax_01 = Math.atan2(v1y-v0y, v1x-v0x);
+				var ax_02 = Math.atan2(v2y-v0y, v2x-v0x);
+				if(ax_02 < ax_01)
+					ax_02 += Math.PI * 2.0;
+				console.log("vx:", v0x, v0y, v1x, v1y, v2x, v2y);
+				console.log("vec: ", v1x-v0x, v1y-v0y, v2x-v0x, v2y-v0y);
+				console.log("angles: ", ax_01, ax_02 - ax_01);
+				for(var i=0; i<3; ++i) {
+					self.singularAngleArray[singArrayIndex++] = v0x;
+					self.singularAngleArray[singArrayIndex++] = v0y;
+					self.singularAngleArray[singArrayIndex++] = ax_01;
+					self.singularAngleArray[singArrayIndex++] = ax_02 - ax_01;
+				}
 			}
 		}
 //		console.log("vertexArray:", self.vertexArray);
@@ -377,11 +432,18 @@ function WqvgViewer(idCanvas) {
 		self.colorTextureArray = new Uint8Array(self.colorTextureArray.buffer);
 //		console.log("colorTextureArray:", self.colorTextureArray);
 		
+		// Creation and loading of vertex array
 		if(self.vertexBuffer === undefined)
 			self.vertexBuffer = self.gl.createBuffer();
 		self.gl.bindBuffer(self.gl.ARRAY_BUFFER, self.vertexBuffer);
 		self.gl.bufferData(self.gl.ARRAY_BUFFER, self.vertexArray, self.gl.STATIC_DRAW);
 		
+		if(self.singularAngleBuffer === undefined)
+			self.singularAngleBuffer = self.gl.createBuffer();
+		self.gl.bindBuffer(self.gl.ARRAY_BUFFER, self.singularAngleBuffer);
+		self.gl.bufferData(self.gl.ARRAY_BUFFER, self.singularAngleArray, self.gl.STATIC_DRAW);
+		
+		// Creation and loading of the color node texture
 		if(self.colorTexture === undefined)
 			self.colorTexture = self.gl.createTexture();
 		self.gl.bindTexture(self.gl.TEXTURE_2D, self.colorTexture);
@@ -392,7 +454,9 @@ function WqvgViewer(idCanvas) {
 		self.gl.texImage2D(self.gl.TEXTURE_2D, 0, self.gl.RGBA,
 			self.colorTextureWidth, self.colorTextureHeight, 0,
 			self.gl.RGBA, self.gl.UNSIGNED_BYTE, self.colorTextureArray);
-			
+		
+		// Bounding box computation and view initialization.
+		// TODO: Move this in a separate method, resetView().
 		var minX = positions[0];
 		var minY = positions[1];
 		var maxX = positions[0];
@@ -406,7 +470,7 @@ function WqvgViewer(idCanvas) {
 		self.viewCenter = [ (minX + maxX) / 2, (minY + maxY) / 2 ];
 		var zoomX = self.canvas.width / (maxX - minX);
 		var zoomY = self.canvas.height / (maxY - minY);
-		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * .95;
+		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * 0.95;
 	};
 	
 	this.screenToScene = function(screen) {
@@ -414,21 +478,21 @@ function WqvgViewer(idCanvas) {
 			self.viewCenter[0] + (screen[0] - self.canvas.width / 2) / self.zoom,
 			self.viewCenter[1] - (screen[1] - self.canvas.height / 2) / self.zoom
 		];
-	}
+	};
 	
 	this.sceneToScreen = function(scene) {
 		return [
 			(scene[0] - self.viewCenter[0]) * self.zoom + self.canvas.width / 2,
 			-(scene[1] - self.viewCenter[1]) * self.zoom + self.canvas.height / 2,
 		];
-	}
+	};
 	
 	this.addControls = function (controlList){
 		if(!controlList) controlList = ['zoom','translate'];
-		if (controlList.indexOf('zoom') != -1) {
-			function MouseWheelHandler(e){
+		if(controlList.indexOf('zoom') != -1) {
+			var mouseWheelHandler = function(e){
 				var delta = e.wheelDelta || -e.deltaY;
-				var factor = (delta>0.)? 1.1: 1./1.1;
+				var factor = (delta>0.0)? 1.1: 1.0/1.1;
 				
 				var offset = getOffset(self.canvas);
 				var scenePos = self.screenToScene(
@@ -441,40 +505,40 @@ function WqvgViewer(idCanvas) {
 				self.zoom *= factor;
 				self.render();
 				e.preventDefault();
-			}
+			};
 
-			self.canvas.addEventListener("wheel", MouseWheelHandler, false);
-			self.canvas.addEventListener('mousewheel', MouseWheelHandler, false);
+			self.canvas.addEventListener("wheel", mouseWheelHandler, false);
+			self.canvas.addEventListener('mousewheel', mouseWheelHandler, false);
 		}
-		if (controlList.indexOf('translate') != -1) {
-			function mouseUpHandler(e) {
+		if(controlList.indexOf('translate') != -1) {
+			var mouseUpHandler = function(e) {
 				if(e.button === 0) {
 					self.lastMousePos = [ e.clientX, e.clientY ];
 					window.removeEventListener('mousemove', mouseMoveHandler);
 					window.removeEventListener('mouseup', mouseUpHandler);
 				}
-			}
-			function mouseDownHandler(e) {
+			};
+			var mouseDownHandler = function(e) {
 				if(e.button === 0) {
 					e.preventDefault();
 					self.lastMousePos = [ e.clientX, e.clientY ];
 					window.addEventListener('mousemove', mouseMoveHandler);
 					window.addEventListener('mouseup', mouseUpHandler);
 				}
-			}
-			function mouseMoveHandler(e) {
+			};
+			var mouseMoveHandler = function(e) {
 				self.viewCenter = [
 					self.viewCenter[0] - (e.clientX-self.lastMousePos[0])/self.zoom,
 					self.viewCenter[1] + (e.clientY-self.lastMousePos[1])/self.zoom
 				];
 				self.lastMousePos = [ e.clientX, e.clientY ];
 				self.render();
-			}
+			};
 			
 			self.canvas.addEventListener('mousedown', mouseDownHandler);
 		}
-	}
+	};
 
-	this.initWebGL(idCanvas); // prévoir fallback canvas 2D
+	this.initWebGL(idCanvas); // TODO: (later) Cavas 2D fallback ?
 	this.render();
 }

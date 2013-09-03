@@ -17,7 +17,7 @@
 
 (function(){
 	var idCanvas = 'demo-wqvg';
-	bigCanvas = document.getElementById(idCanvas);
+	var bigCanvas = document.getElementById(idCanvas);
 //	bigCanvas.width = document.width;
 //	bigCanvas.height = document.height-42;
 
