@@ -84,33 +84,33 @@
         sampleId = id;
         console.log("Loading '"+sampleId+"' from HTTP...");
 
-	    var wqvgRequest = new XMLHttpRequest();
-	    wqvgRequest.open("GET", sampleId+".wqvg", true);
-	    wqvgRequest.responseType = "blob";
-
-	    wqvgRequest.addEventListener("load", function(e) {
-            console.log("Successfully loaded '"+sampleId+"' from HTTP.");
-		    wqvg.loadWqvg(e.target.response);
-            terminateWqvgFromHttp();
-	    }, false);
-	    wqvgRequest.addEventListener("error", function(e) {
-            console.log("'"+sampleId+"' loading failed.");
-            terminateWqvgFromHttp();
-	    }, false);
-	    wqvgRequest.addEventListener("progress", function(e) {
-            if(e.lengthComputable)
-                progressBar.value = e.loaded / e.total;
-	    }, false);
-
-        var sampleElem = document.getElementById(sampleId);
-        if(sampleElem)
-            sampleElem.classList.add("selected_sample");
-
-        var progressBar = sampleElem.getElementsByTagName("progress")[0];
-        progressBar.style.display = "block";
-        progressBar.value = 0;
-
         try {
+    	    var wqvgRequest = new XMLHttpRequest();
+	        wqvgRequest.open("GET", "sample/"+sampleId+".wqvg", true);
+	        wqvgRequest.responseType = "blob";
+
+	        wqvgRequest.addEventListener("load", function(e) {
+                console.log("Successfully loaded '"+sampleId+"' from HTTP.");
+		        wqvg.loadWqvg(e.target.response);
+                terminateWqvgFromHttp();
+	        }, false);
+	        wqvgRequest.addEventListener("error", function(e) {
+                console.log("'"+sampleId+"' loading failed.");
+                terminateWqvgFromHttp();
+	        }, false);
+	        wqvgRequest.addEventListener("progress", function(e) {
+                if(e.lengthComputable)
+                    progressBar.value = e.loaded / e.total;
+	        }, false);
+
+            var sampleElem = document.getElementById(sampleId);
+            if(sampleElem)
+                sampleElem.classList.add("selected_sample");
+
+            var progressBar = sampleElem.getElementsByTagName("progress")[0];
+            progressBar.style.display = "block";
+            progressBar.value = 0;
+
         	wqvgRequest.send();
         }
         catch(e) {
