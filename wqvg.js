@@ -170,7 +170,7 @@ function WqvgViewer(idCanvas) {
 		try { self.gl = self.canvas.getContext("webgl") || self.canvas.getContext("experimental-webgl"); } 
 		catch(e) {}
 		if(!self.gl) {
-			alert("Your web browser does not support WebGL. This demo won't work.");
+			throw Error("Failed to create WebGL context.");
 			return;
 		}
 		self.gl = WebGLDebugUtils.makeDebugContext(self.gl);
@@ -221,6 +221,13 @@ function WqvgViewer(idCanvas) {
 		self.viewCenter = [ 0.5, 0.5 ];
 		self.zoom = 550.0;
 	};
+
+    this.resize = function(width, height) {
+        self.gl.canvas.width = width;
+        self.gl.canvas.height = height;
+		self.gl.viewport(0, 0, width, height);
+        self.render();
+    }
 	
 	this.renderPass = function(program, buffer, offset, size) {
 		self.gl.useProgram(program);
@@ -311,23 +318,35 @@ function WqvgViewer(idCanvas) {
 			console.log("nbTriangle:", nbTriangle);
 			console.log("nbSingular:", nbSingular);
 
+            self.qvgComment = "";
             if(header[1] >= 2) {    // File has comment
                 var commentSize = (new Uint32Array(rawBuffer, pos, 1))[0];
-//                console.log("Comment:", commentSize);
     			pos += 4;
                 var asciiBuffer = new Uint8Array(rawBuffer, pos, commentSize);
-                self.qvgComment = String.fromCharCode.apply(null, asciiBuffer);
+//                self.qvgComment = String.fromCharCode.apply(null, asciiBuffer);
+                var charList = [];
+                var encodePos = 0;
+                for(var c=0; c<asciiBuffer.length; ++c) {
+                    if((asciiBuffer[c] & 0x80) == 0)
+                        charList[encodePos] = String.fromCharCode(asciiBuffer[c]);
+                    else if((asciiBuffer[c] & 0xe0) == 0xc0) {
+                        charList[encodePos] = String.fromCharCode(((asciiBuffer[c] & 0x1f) << 6) | (asciiBuffer[c+1] & 0x3f));
+                        ++c;
+                    }
+                    else
+                        charList[encodePos] = "?";
+                    ++encodePos;
+                }
+                self.qvgComment = charList.join("");
     			pos += commentSize;
                 console.log(self.qvgComment);
             }
 
 			var vertexDataSize = (2 * nbVertex) * 4;
 			if(pos + vertexDataSize > rawBuffer.byteLength) { console.log("Error: Unexpected end of file."); return; }
-			console.log("nbCoord:", vertexDataSize, "pos:", pos);
-			console.log(rawBuffer, pos, 2 * nbVertex);
 			var vertexArray = new Float32Array(rawBuffer.slice(pos, pos+vertexDataSize));
-//			console.log(vertexArray);
 			pos += vertexDataSize;
+//			console.log(vertexArray);
 
 			var indexDataSize = 3 * (nbTriangle+nbSingular) * 4;
 			if(pos + indexDataSize > rawBuffer.byteLength) { console.log("Error: Unexpected end of file."); return; }
@@ -344,6 +363,8 @@ function WqvgViewer(idCanvas) {
 			self.initBuffers(nbTriangle, nbSingular,
 				vertexArray, indexArray, colorArray);
 
+            if(self.onload)
+                self.onload(self);
 			self.render();
 		};
 		reader.onerror = function(event) {

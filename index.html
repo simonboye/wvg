@@ -22,17 +22,88 @@
 <html lang="en">
 	<head>
 		<meta charset="utf-8"/>
-		<title>Demo wqvg</title>
+		<title>WQVG Demo</title>
 		<link rel="stylesheet" href="style.css"/>
 		<script src="webgl-debug.js"></script>
 	</head>
 	<body>
-		<h1>Demo wqvg</h1>
-		<input id="wqvgFilename" type="file" value="data.wqvg"/>
-		<canvas id="demo-wqvg" width="800px" height="600px">
-      Your web browser does not support the canvas element. Please use a recent
-      web browser with support for WebGL.
-    </canvas>
+		<header id="title_bloc">
+            <h1>WQVG Demo</h1>
+            <a href="about.html">About this demo...</a>
+        </header>
+        <div id="content_bloc">
+            <noscript>
+                <h2>This demo requires Javascript !</h2>
+                <p>This demo uses WebGL to display an image in the wqvg file
+                    format. In order to execute it successfully, you will need
+                    a recent web browser that supports WebGL with Javascript
+                    enabled.</p>
+            </noscript>
+            <aside id="webgl_error_message">
+                <h2>Error: failed to initialize WebGL</h2>
+                <p>This problem can be caused by various reasons. Maybe your
+                    web browser does not support WebGL or its support is
+                    disabled, or your graphic drivers are not up to date.</p>
+                <p>This demo has been successfully run under Firefox 23 and
+                    Chromium 28, both under Linux. Internet Explorer is
+                    currently not supported and we did not run tests on mobile
+                    devices.</p>
+                <p>Before sending a bug report, please check this
+                    page and follow any instruction to get WebGL on your
+                    browser:
+                    <a href="http://get.webgl.org/">http://get.webgl.org/</a>
+                    <p>
+            </aside>
+    		<canvas id="demo-wqvg" width="800px" height="600px">
+                <h2>This demo requires WebGL !</h2>
+                <p>Your web browser does not support the canvas element. Please
+                    use a recent web browser with support
+                    for WebGL.</p>
+            </canvas>
+        </div>
+        <nav id="menu_bloc">
+            <div class="menu_group">
+                <h2>View:</h2>
+                <a href="#">Recenter view</a>
+                <a href="#">Wireframe</a>
+            </div>
+            <div class="menu_group">
+                <h2>Samples:</h2>
+                <ul id="wqvg_list">
+                    <li id="neko" class="wqvg_sample">
+                        Neko
+                        <progress class="sample_progress"></progress>
+                    </li>
+                    <li id="poring" class="wqvg_sample">
+                        Poring
+                        <progress class="sample_progress"></progress>
+                    </li>
+                    <li id="sphere" class="wqvg_sample">
+                        Sphere
+                        <progress class="sample_progress"></progress>
+                    </li>
+                    <li id="tree" class="wqvg_sample">
+                        Tree
+                        <progress class="sample_progress"></progress>
+                    </li>
+                    <li id="umbrella" class="wqvg_sample">
+                        Umbrella
+                        <progress class="sample_progress"></progress>
+                    </li>
+                    <li id="yin-yang" class="wqvg_sample">
+                        Yin-Yang
+                        <progress class="sample_progress"></progress>
+                    </li>
+                </ul>
+        		<input id="wqvgFilename" type="file" value="data.wqvg"/>
+            </div>
+            <div class="menu_group">
+                <h2>About this file:</h2>
+                <div id="info_text">
+                    No file loaded yet.
+                </div>
+            </div>
+        </nav>
 		<script src="wqvg.js" type="text/javascript"></script>
 		<script src="main.js" type="text/javascript"></script>
 	</body>

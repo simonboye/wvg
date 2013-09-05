@@ -15,6 +15,123 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-* {margin:0;padding:0;border:0;font-family: sans-serif;}
-h1 {text-align: center;}
-#wqvgFilename{position: absolute; top:8px;}
+/** {margin:0;padding:0;border:0;font-family: sans-serif;}*/
+
+html, body, ul, li, h1, h2, h3, h4, h5 {
+    margin: 0;
+    padding: 0;
+    color: #303030;
+}
+
+html {
+    background: #c0c0c0;
+}
+
+h1 {
+    display: inline;
+    margin: 0 0 0 .5em;
+    font-size: 2em;
+    line-height: 1.75em;
+}
+
+#title_bloc {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: 3.5em;
+
+    background: #ffa000;
+}
+
+#content_bloc {
+    position: absolute;
+    left: 0;
+    right: 16em;
+    top: 3.5em;
+    bottom: 0;
+
+    overflow: hidden;
+
+    background: #ffffff;
+}
+
+#menu_bloc {
+    position: absolute;
+    width: 16em;
+    right: 0;
+    top: 3.5em;
+    bottom: 0em;
+
+    overflow-x: hidden;
+    overflow-y: auto;
+
+/*    background: #20d040;*/
+}
+
+/*#info_bloc {
+    position: absolute;
+    width: 16em;
+    right: 0;
+    bottom: 0;
+    height: 12em;
+
+    overflow-x: hidden;
+    overflow-y: auto;
+*/
+/*    background: #40a0f0;*/
+/*}*/
+
+#webgl_error_message {
+    display: none;
+    padding: .5em;
+}
+
+.menu_group {
+    margin: .5em;
+    padding: .5em;
+/*    background: #40f060;*/
+    background: #e0e0e0;
+    border-radius: .5em;
+}
+
+.menu_group h2 {
+    font-size: 1em;
+    margin-top: -.2em;
+    margin-bottom: .2em;
+}
+
+#wqvg_list {
+/*    background: #c0ffc0;*/
+    margin-bottom: .5em;
+}
+
+.wqvg_sample {
+    list-style-type: none;
+    cursor: pointer;
+    text-decoration: underline;
+    padding: .25em
+}
+
+.sample_progress {
+    display: none;
+    float: right;
+    width: 6em;
+}
+
+.wqvg_sample:hover {
+/*    background: #80ff80;*/
+    border: solid 2px #303030;
+    margin: -2px;
+    border-radius: .25em;
+}
+
+.selected_sample {
+    background: #c0c0c0;
+}
+
+#info_text {
+    font-size: .75em;
+}
+
+/*#wqvgFilename{position: absolute; top:8px;}*/
