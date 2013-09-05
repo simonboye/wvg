@@ -69,11 +69,12 @@
         wqvgRequest = null;
         if(sampleId) {
             var sampleElem = document.getElementById(sampleId);
-            if(sampleElem)
+            if(sampleElem) {
                 sampleElem.classList.remove("selected_sample");
+                var progressBar = sampleElem.getElementsByTagName("progress")[0];
+                progressBar.style.display = "none";
+            }
         }
-        var progressBar = sampleElem.getElementsByTagName("progress")[0];
-        progressBar.style.display = "none";
         sampleId = null;
     }
 
