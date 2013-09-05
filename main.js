@@ -86,7 +86,7 @@
 
         try {
     	    var wqvgRequest = new XMLHttpRequest();
-	        wqvgRequest.open("GET", "sample/"+sampleId+".wqvg", true);
+	        wqvgRequest.open("GET", "samples/"+sampleId+".wqvg", true);
 	        wqvgRequest.responseType = "blob";
 
 	        wqvgRequest.addEventListener("load", function(e) {
