@@ -23,6 +23,7 @@
 	var contentBloc = document.getElementById(idContentBloc);
 	var bigCanvas = document.getElementById(idCanvas);
 	var webglErrorMessage = document.getElementById("webgl_error_message");
+    var centerButton = document.getElementById("center_button");
     var fileChooser = document.getElementById('wqvgFilename');
     var infoText = document.getElementById("info_text");
 
@@ -32,6 +33,7 @@
     	var wqvg = new WqvgViewer(idCanvas);
     }
     catch(e) {
+        console.error(e.name + ": " + e.message);
         bigCanvas.style.display = "none";
         webglErrorMessage.style.display = "block";
         return;
@@ -127,5 +129,7 @@
     for(var i=0; i<samples_buttons.length; ++i) {
         samples_buttons[i].addEventListener("click", loadSample, false);
     }
+
+    centerButton.addEventListener("click", function() { wqvg.centerView(); wqvg.render(); }, false);
 })();
 

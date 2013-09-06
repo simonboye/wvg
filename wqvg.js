@@ -486,21 +486,25 @@ function WqvgViewer(idCanvas) {
 		
 		// Bounding box computation and view initialization.
 		// TODO: Move this in a separate method, resetView().
-		var minX = positions[0];
-		var minY = positions[1];
-		var maxX = positions[0];
-		var maxY = positions[1];
+		self.minX = positions[0];
+		self.minY = positions[1];
+		self.maxX = positions[0];
+		self.maxY = positions[1];
 		for(var i=0; i<positions.length/2; ++i) {
-			if(positions[2*i + 0] < minX) minX = positions[2*i + 0];
-			if(positions[2*i + 1] < minY) minY = positions[2*i + 1];
-			if(positions[2*i + 0] > maxX) maxX = positions[2*i + 0];
-			if(positions[2*i + 1] > maxY) maxY = positions[2*i + 1];
+			if(positions[2*i + 0] < self.minX) self.minX = positions[2*i + 0];
+			if(positions[2*i + 1] < self.minY) self.minY = positions[2*i + 1];
+			if(positions[2*i + 0] > self.maxX) self.maxX = positions[2*i + 0];
+			if(positions[2*i + 1] > self.maxY) self.maxY = positions[2*i + 1];
 		}
-		self.viewCenter = [ (minX + maxX) / 2, (minY + maxY) / 2 ];
-		var zoomX = self.canvas.width / (maxX - minX);
-		var zoomY = self.canvas.height / (maxY - minY);
-		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * 0.95;
+        self.centerView();
 	};
+
+    this.centerView = function() {
+		self.viewCenter = [ (self.minX + self.maxX) / 2, (self.minY + self.maxY) / 2 ];
+		var zoomX = self.canvas.width / (self.maxX - self.minX);
+		var zoomY = self.canvas.height / (self.maxY - self.minY);
+		self.zoom = ((zoomX < zoomY)? zoomX: zoomY) * 4.0;
+    }
 	
 	this.screenToScene = function(screen) {
 		return [
