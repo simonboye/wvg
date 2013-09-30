@@ -270,6 +270,8 @@ function WqvgViewer(idCanvas) {
 		self.gl.disableVertexAttribArray(program.offsetLoc);
 		self.gl.disableVertexAttribArray(program.colorLoc);
 		self.gl.disableVertexAttribArray(program.viewMatrixLoc);
+		if(program == self.singularProgram)
+			self.gl.disableVertexAttribArray(self.singularAngleLoc);
 	};
 
 	this.render = function(){
